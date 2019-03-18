@@ -109,20 +109,20 @@ typedef struct {
 } DMAP;
 
 typedef	struct {
-	unsigned short	lab;
+	unsigned short	lab;// label
 	int			prid;
 	point2i		dmin;
-	point2i		dmax;
+	point2i		dmax;   // a bounding box which contain the region in range image
 	point3d		maxp;
-	point3d		minp;
-	int			ptnum;
+	point3d		minp;   // a 3D bounding box which contain the region in space
+	int			ptnum;  // number of points
 	point3d		maxpH;
-	point3d		minpH;
-	int			ptnumH;
-	point3d		cp;
-	double		wi;
-	double		minDisH;
-	double		minDisV;
+	point3d		minpH;  // a 3D bounding box which contain the high part of region in space
+	int			ptnumH; // number of points of the high part
+	point3d		cp;     // center of the region
+	double		wi;     // length of diagonal of the cross section
+	double		minDisH;// minimum space distance of horizontal neighbour pixels
+	double		minDisV;// minimum space distance of vertical neighbour pixels
 	double		maxDisH;
 	double		maxDisV;
 } SEGBUF;
