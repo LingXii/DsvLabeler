@@ -109,36 +109,38 @@ typedef struct {
 } DMAP;
 
 typedef	struct {
-	unsigned short	lab;// label
-	int			prid;
-	point2i		dmin;
-	point2i		dmax;   // a bounding box which contain the region in range image
-	point3d		maxp;
-	point3d		minp;   // a 3D bounding box which contain the region in space
-	int			ptnum;  // number of points
-	point3d		maxpH;
-	point3d		minpH;  // a 3D bounding box which contain the high part of region in space
-	int			ptnumH; // number of points of the high part
-	point3d		cp;     // center of the region
-	double		wi;     // length of diagonal of the cross section
-	double		minDisH;// minimum space distance of horizontal neighbour pixels
-	double		minDisV;// minimum space distance of vertical neighbour pixels
-	double		maxDisH;
-	double		maxDisV;
+    unsigned short	lab;// label
+    int			prid;
+    point2i		dmin;
+    point2i		dmax;   // a bounding box which contain the region in range image
+    point3d		maxp;
+    point3d		minp;   // a 3D bounding box which contain the region in space
+    int			ptnum;  // number of points
+    point3d		maxpH;
+    point3d		minpH;  // a 3D bounding box which contain the high part of region in space
+    int			ptnumH; // number of points of the high part
+    point3d		cp;     // center of the region
+    double		wi;     // length of diagonal of the cross section
+    double		minDisH;// minimum space distance of horizontal neighbour pixels
+    double		minDisV;// minimum space distance of vertical neighbour pixels
+    double		maxDisH;
+    double		maxDisV;
 } SEGBUF;
 
 typedef struct {
 	int				wid;
 	int				len;
+    int             *gt; // ground truth
 	point3fi		*pts;
-    unsigned char			*segflg;
+    unsigned char	*segflg;
 	int				*regionID;
 	int				regnum;
 	SEGBUF			*segbuf;
-	IplImage		*rMap;
-	IplImage		*lMap;
-	IplImage		*dMap;
-	IplImage		*sMap;
+    IplImage		*rMap; // range image
+    IplImage		*lMap; // segmentation result
+    IplImage		*dMap; // data association
+    IplImage		*sMap; // classification result
+    IplImage        *gtMap;// ground truth
 	point3d			ang;
 	point3d			shv;
 } RMAP;
@@ -152,13 +154,13 @@ typedef struct {
 #define	LOHOFLG			15
 
 #define	OBGLAB0			0
-#define	OBGLAB1			1
-#define	OBGLAB2			2
-#define	OBGLAB3			3
-#define	OBGLAB4			4
-#define	OBGLAB5			5
-#define	OBGLAB6			6
-#define	OBGLAB7			7
+#define	OBGLAB1			1 // people
+#define	OBGLAB2			1 // bike
+#define	OBGLAB3			2 // car
+#define	OBGLAB4			5 // building
+#define	OBGLAB5			3 // chunk, sign
+#define	OBGLAB6			3 // small
+#define	OBGLAB7			3 // bush
 #define OBJGROUND		100
 #define	OBJBACKGROUND	101
 

@@ -1,8 +1,12 @@
 #include "DsvLabelMv.h"
 #include <fstream>
 #include <QString>
-
+#include <string>
 #include <unordered_set>
+#include <pcl/io/pcd_io.h>
+#include <pcl/io/io.h>
+#include <pcl/point_types.h>
+#include <pcl/visualization/cloud_viewer.h>
 
 TRANSINFO	calibInfo;
 
@@ -12,11 +16,13 @@ std::ifstream dfp;
 int		dsbytesiz = sizeof (ONEDSVDATA);
 int		dFrmNum=0;
 int		dFrmNo=0;
+string img_path = "images/";
 
 bool	videooutput = false;
 CvVideoWriter* riFrameWriter = NULL;
 CvVideoWriter* seFrameWriter = NULL;
 CvVideoWriter* clFrameWriter = NULL;
+CvVideoWriter* gtFrameWriter = NULL;
 
 FILE	*seglogfp=NULL;
 
@@ -24,14 +30,14 @@ RMAP	rm;
 
 ONEDSVFRAME	*onefrm;
 
-#define	COLORNUM		16
+#define	COLORNUM		17
 unsigned char	LEGENDCOLORS[COLORNUM][3] =
 			{
 				{128,255,255},{0,0,255},{255,0,0},{0,255,0},
-				{128,128,255},{255,255,0},{0,128,255},{255,0,255},{0,255,255},
+                {128,128,255},{255,255,0},{255,164,164},{255,0,255},{0,255,255},
 				{128,0,128},{255,128,0},{255,128,255},
 				{164,255,255},
-				{255,64,64},{0,128,128},{128,128,0},
+                {255,64,64},{0,128,128},{128,128,0},{0,0,0}
 
 			};
 
@@ -73,11 +79,57 @@ bool LoadCalibFile (const char *szFile)
 	return true;
 }
 
+void transformToPclFormat()
+{   // bug!
+    int x, y;
+    double	rng;
+    point3fi *p;
+    int i_time = onefrm->dsv[0].millisec;
+    string s_time = to_string(i_time);
+    pcl::PointCloud<pcl::PointXYZI> cloud;
+    cloud.width    = LINES_PER_BLK*BKNUM_PER_FRM;
+    cloud.height   = PNTS_PER_LINE;
+    cloud.is_dense = true;  //不是稠密型的
+    int num = 0;
+    cloud.points.resize (cloud.width * cloud.height);  //点云总数大小
+    for (int i=0; i<BKNUM_PER_FRM; i++) {
+        for (int j=0; j<LINES_PER_BLK; j++) {
+            for (int k=0; k<PNTS_PER_LINE; k++) {
+                p = &onefrm->dsv[i].points[j*PNTS_PER_LINE+k];
+                if (!p->i)
+                    continue;
+                rng=sqrt(sqr(p->x)+sqr(p->y)+sqr(p->z));
+                x=i*LINES_PER_BLK+j;
+                y=k;
+                cloud.points[num].x = rm.pts[y*rm.wid+x].x;
+                cloud.points[num].y = rm.pts[y*rm.wid+x].x;
+                cloud.points[num].z = rm.pts[y*rm.wid+x].z;
+                cloud.points[num].intensity =  rm.pts[y*rm.wid+x].i;
+                //maybe i missunderstanded the meaning of i in points
+                num += 1;
+            }
+        }
+
+    }
+    string name = "tmp_pcd/pcd_" + s_time + ".pcd";
+    pcl::io::savePCDFileASCII(name,cloud);
+//    pcl::visualization::CloudViewer viewer("point cloud");
+//    viewer.showCloud(cloud.makeShared());
+}
+
 void ProcessOneFrame ()
 {
 	int x, y;
 	double	rng;
 	point3fi *p;
+    int i_time = onefrm->dsv[0].millisec;
+    string s_time = to_string(i_time);
+//    stringstream ss;
+//    ss<<i_time;
+//    ss>>s_time;
+    string gt_end = "_gt.png";
+    Mat gt_img;
+    gt_img = imread(img_path + s_time + gt_end);
 
 	//处理一帧vel32数据、传感器坐标系数据
 
@@ -86,6 +138,7 @@ void ProcessOneFrame ()
 	cvZero(rm.lMap);	//分割图像
 	cvZero(rm.dMap);	//数据关联图像
 	cvZero(rm.sMap);	//分类图像
+    cvZero(rm.gtMap);	//ground truth图像
 	memset (rm.pts, 0, sizeof (point3fi)*rm.wid*rm.len);	//距离图像对应的激光点阵列
     memset (rm.segflg, 0, sizeof (unsigned char)*rm.wid*rm.len);		//距离图像对应的分类标签阵列
 	memset (rm.regionID, 0, sizeof (int)*rm.wid*rm.len);	//距离图像对应的分割标签阵列
@@ -109,8 +162,9 @@ void ProcessOneFrame ()
 				x=i*LINES_PER_BLK+j;
 				y=k;
 				rm.pts[y*rm.wid+x] = onefrm->dsv[i].points[j*PNTS_PER_LINE+k];
-				rm.rMap->imageData[y*rm.wid+x] = min(255,int(rng*10));
+				rm.rMap->imageData[y*rm.wid+x] = min(255,int(rng*10));                
                 lab = onefrm->dsv[i].lab[j*PNTS_PER_LINE+k];
+                rm.gt[y*rm.wid+x] = gt_img.at<uchar>(y,x/2,0);
                 if (lab > 0)
                     idx_set.insert(lab);
 			}
@@ -119,6 +173,7 @@ void ProcessOneFrame ()
 
 	//对每一行数据中短暂无效激光点（cnt<5，约水平1度)进行内插补齐，否则这些无效点处会被认为是边界点
 	SmoothingData ();
+//    transformToPclFormat();
 
 	//根据大致的传感器高度，找到连续的地面点，拟合地平面，地平面保存到Equation中
 	static double	Equation[4]={0,0,1,0};
@@ -150,15 +205,21 @@ void ProcessOneFrame ()
 	for (y=0; y<rm.len; y++) {
 		for (x=0; x<rm.wid; x++) {
 			if (rm.regionID[y*rm.wid+x]==EDGEPT) {
-				rm.lMap->imageData[(y*rm.wid+x)*3+2]	= 128;
-				rm.lMap->imageData[(y*rm.wid+x)*3+1]	= 128;
-				rm.lMap->imageData[(y*rm.wid+x)*3+0]	= 128;
+                rm.lMap->imageData[(y*rm.wid+x)*3+2]	= 128;
+                rm.lMap->imageData[(y*rm.wid+x)*3+1]	= 128;
+                rm.lMap->imageData[(y*rm.wid+x)*3+0]	= 128;
+                rm.sMap->imageData[(y*rm.wid+x)*3+2]	= 0;
+                rm.sMap->imageData[(y*rm.wid+x)*3+1]	= 255;
+                rm.sMap->imageData[(y*rm.wid+x)*3+0]	= 0;
 			}
 			else if (rm.regionID[y*rm.wid+x]==GROUND)
 			{
 				rm.lMap->imageData[(y*rm.wid+x)*3+2]	= 0;
 				rm.lMap->imageData[(y*rm.wid+x)*3+1]	= 0;
 				rm.lMap->imageData[(y*rm.wid+x)*3+0]	= 128;
+                rm.sMap->imageData[(y*rm.wid+x)*3+2]	= 164;
+                rm.sMap->imageData[(y*rm.wid+x)*3+1]	= 164;
+                rm.sMap->imageData[(y*rm.wid+x)*3+0]	= 255;
 			}
 			else if (rm.regionID[y*rm.wid+x]==NONVALID)
 			{
@@ -197,6 +258,11 @@ void ProcessOneFrame ()
 				rm.sMap->imageData[(y*rm.wid+x)*3+1]	= LEGENDCOLORS[val][1];
 				rm.sMap->imageData[(y*rm.wid+x)*3+0]	= LEGENDCOLORS[val][0];
 			}
+            val = rm.gt[y*rm.wid+x]%COLORNUM;
+            if(val==0) val=16;
+            rm.gtMap->imageData[(y*rm.wid+x)*3+2]	= LEGENDCOLORS[val][2];
+            rm.gtMap->imageData[(y*rm.wid+x)*3+1]	= LEGENDCOLORS[val][1];
+            rm.gtMap->imageData[(y*rm.wid+x)*3+0]	= LEGENDCOLORS[val][0];
 		}
 	}
 }
@@ -254,6 +320,7 @@ void InitRmap (RMAP *rm)
 {
 	rm->wid = LINES_PER_BLK*BKNUM_PER_FRM;
 	rm->len = PNTS_PER_LINE;
+    rm->gt = new int[rm->wid*rm->len];
 	rm->pts = new point3fi[rm->wid*rm->len];
     rm->segflg = new unsigned char[rm->wid*rm->len];
 	rm->regionID = new int[rm->wid*rm->len];
@@ -262,6 +329,7 @@ void InitRmap (RMAP *rm)
 	rm->lMap = cvCreateImage(cvSize(rm->wid,rm->len), IPL_DEPTH_8U, 3);
 	rm->dMap = cvCreateImage(cvSize(rm->wid,rm->len), IPL_DEPTH_8U, 3);
 	rm->sMap = cvCreateImage(cvSize(rm->wid,rm->len), IPL_DEPTH_8U, 3);
+    rm->gtMap = cvCreateImage(cvSize(rm->wid,rm->len), IPL_DEPTH_8U, 3);
 }
 
 void ReleaseRmap (RMAP *rm)
@@ -310,6 +378,7 @@ void DoLabeling()
 		riFrameWriter = cvCreateVideoWriter("ri.avi",CV_FOURCC('M', 'J', 'P', 'G'), 15, cvSize (rm.wid/2, rm.len*4.5));
 		seFrameWriter = cvCreateVideoWriter("se.avi",CV_FOURCC('M','J','P','G'), 15, cvSize (rm.wid/2, rm.len*4.5));
 		clFrameWriter = cvCreateVideoWriter("cl.avi",CV_FOURCC('M','J','P','G'), 15, cvSize (rm.wid/2, rm.len*4.5));
+        gtFrameWriter = cvCreateVideoWriter("gt.avi",CV_FOURCC('M','J','P','G'), 15, cvSize (rm.wid/2, rm.len*4.5));
 	}
 
 	CvFont font;
@@ -350,9 +419,13 @@ void DoLabeling()
 		cvResize (rm.lMap, col);
 		if (videooutput)
 			cvWriteFrame(seFrameWriter, col);
-		cvShowImage("segmentation",col);
+//		cvShowImage("segmentation",col);
 		cvResize (rm.dMap, col);
-		cvShowImage("data association",col);
+//		cvShowImage("data association",col);
+        cvResize (rm.gtMap, col);
+        cvShowImage("ground truth",col);
+        if (videooutput)
+            cvWriteFrame(gtFrameWriter, col);
 
 		//if (videooutput)
 		//	cvWriteFrame(clFrameWriter, col);
@@ -360,6 +433,14 @@ void DoLabeling()
 		cvShowImage("classification",col);
 		if (videooutput)
 			cvWriteFrame(clFrameWriter, col);
+
+//        if(onefrm->dsv[0].millisec == 34889374)
+//        {
+//            Mat LMAP(rm.lMap);
+//            imwrite("seg.png",LMAP);
+//            Mat SMAP(rm.sMap);
+//            imwrite("classify.png",SMAP);
+//        }
 
 		char WaitKey;
 		WaitKey = cvWaitKey(waitkeydelay);
@@ -378,6 +459,7 @@ void DoLabeling()
 	if (riFrameWriter)	cvReleaseVideoWriter(&riFrameWriter);
 	if (seFrameWriter)	cvReleaseVideoWriter(&seFrameWriter);
 	if (clFrameWriter)	cvReleaseVideoWriter(&clFrameWriter);
+    if (gtFrameWriter)	cvReleaseVideoWriter(&gtFrameWriter);
 
 	ReleaseRmap (&rm);
 	ReleaseDmap ();
@@ -390,13 +472,13 @@ void DoLabeling()
 int main (int argc, char *argv[])
 {
     videooutput = 1; //
-    std::string dsvlfilename = "/media/pku-m/Data/dsvldata/20170410-2/2-1-mv.dsvl";
+    std::string dsvlfilename = "2-2-bg.dsvl";
     //std::string dsvlfilename = "/home/pku-m/SemanticMap/Data/FineAnnotation/2-1/2-1.dsvl";
     //std::string dsvlfilename = "/media/pku-m/OrangePassport4T1/SemanticDataCollect/20170410_campus/origin/campus2/3D/2.dsv";
 
-    std::string calibfilename = "/home/pku-m/SemanticMapHL/Tools/SImpleClassifier/DsvLabeler/calib32.txt";
+    std::string calibfilename = "calib32.txt";
 
-    std::string outseglogfilename = "2-1-classified.log";
+    std::string outseglogfilename = "2-2-classified.log";
 
     //dsv has no label infomation and the onefrm->dsv[i].lab[j*PNTS_PER_LINE+k] is empty
     if (QString(dsvlfilename.c_str()).endsWith("dsv"))
