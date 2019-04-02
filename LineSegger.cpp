@@ -136,8 +136,8 @@ bool getOnelist (int *startid, int *endid)
 			if ((x_c[i]!=INVALIDDOUBLE)||(y_c[i]!=INVALIDDOUBLE)) {
 				pt.x = x_c[i];
 				pt.y = y_c[i];
-				rangeDis = sqrt(sqr(pt.x)+sqr(pt.y));
-				dis = sqrt(sqr(pt.x-ptpre.x)+sqr(pt.y-ptpre.y));
+                rangeDis = sqrt(SQR(pt.x)+SQR(pt.y));
+                dis = sqrt(SQR(pt.x-ptpre.x)+SQR(pt.y-ptpre.y));
 				dislim = max(0.5,tan(0.25*(double)(i-ipre)*M_PI/180.0)*rangeDis);
 				if (dis>dislim) {
 					break;
@@ -172,8 +172,8 @@ void segment(int start_in, int finish_in, double *sig_out, double *sum_out)
 
     pos = pos + start_in - 1;
     /* euclidean length */
-    length = sqr(x_c2[1]-x_c2[end2]);
-    length += sqr(y_c2[1]-y_c2[end2]);
+    length = SQR(x_c2[1]-x_c2[end2]);
+    length += SQR(y_c2[1]-y_c2[end2]);
     length = sqrt(length);
 //    sig1 = dev / length;
 	sig1 = dev;
@@ -381,7 +381,7 @@ bool _EstGround (point3fi *pts, unsigned char *segflg, double *WX, double *WY, d
 			maxz = max(p1->z,p2->z);
 			minz = min(p1->z,p2->z);
 
-			wid = sqrt (sqr(p1->x-p2->x)+sqr(p1->y-p2->y));
+            wid = sqrt (SQR(p1->x-p2->x)+SQR(p1->y-p2->y));
 			rng = min(p2r(p1),p2r(p2));
 			if ((wid>10.0 && maxz<-1.0) || maxz<-2.0) {// || (wid>5.0 && maxz<0.0 && (maxz-(-2.0))/rng<0.015)) {
 				for (iii=i; iii<ii; iii++) {

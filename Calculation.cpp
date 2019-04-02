@@ -359,7 +359,7 @@ void rotatePoint3fi (point3fi &pt, MATRIX &a)
 
 double ppDistance2d (point2d *p1, point2d *p2)
 {
-	return sqrt(sqr(p1->x-p2->x)+sqr(p1->y-p2->y));
+    return sqrt(SQR(p1->x-p2->x)+SQR(p1->y-p2->y));
 }
 
 double innerProduct2d (point2d *v1, point2d *v2)
@@ -369,7 +369,7 @@ double innerProduct2d (point2d *v1, point2d *v2)
 
 double normVector2d (point2d *p)
 {
-	return (sqrt(sqr(p->x)+sqr(p->y)));
+    return (sqrt(SQR(p->x)+SQR(p->y)));
 }
 
 double normalize2d (point2d *p)
@@ -387,10 +387,10 @@ double normalize2d (point2d *p)
 
 double ppDistance3fi (point3fi *pt1, point3fi *pt2)
 {
-	return (sqrt(sqr(pt1->x-pt2->x)+sqr(pt1->y-pt2->y)+sqr(pt1->z-pt2->z)));
+    return (sqrt(SQR(pt1->x-pt2->x)+SQR(pt1->y-pt2->y)+SQR(pt1->z-pt2->z)));
 }
 
 double p2r (point3fi *pt1)
 {
-	return (sqrt(sqr(pt1->x)+sqr(pt1->y)+sqr(pt1->z)));
+    return (sqrt(SQR(pt1->x)+SQR(pt1->y)+SQR(pt1->z)));
 }

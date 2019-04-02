@@ -1,4 +1,5 @@
 #include "DsvLabelMv.h"
+#include "pclmethod.h"
 #include <fstream>
 #include <QString>
 #include <string>
@@ -7,6 +8,10 @@
 #include <pcl/io/io.h>
 #include <pcl/point_types.h>
 #include <pcl/visualization/cloud_viewer.h>
+
+#define RG 1
+#define LCCP 2
+int MODE = LCCP;
 
 TRANSINFO	calibInfo;
 
@@ -18,7 +23,7 @@ int		dFrmNum=0;
 int		dFrmNo=0;
 string img_path = "images/";
 
-bool	videooutput = false;
+bool	videooutput = true;
 CvVideoWriter* riFrameWriter = NULL;
 CvVideoWriter* seFrameWriter = NULL;
 CvVideoWriter* clFrameWriter = NULL;
@@ -79,42 +84,54 @@ bool LoadCalibFile (const char *szFile)
 	return true;
 }
 
+float to_rgb(int x) // transfer label x to float rgb format
+{
+    int val = x%COLORNUM;
+    int r = LEGENDCOLORS[val][2];
+    int g = LEGENDCOLORS[val][1];
+    int b = LEGENDCOLORS[val][0];
+    int i_rgb = r<<16 | g<<8 | b;
+    int* p = &i_rgb;
+    float f_rgb = *((float*)p);
+    return f_rgb;
+}
+
 void transformToPclFormat()
-{   // bug!
+{
     int x, y;
     double	rng;
     point3fi *p;
     int i_time = onefrm->dsv[0].millisec;
     string s_time = to_string(i_time);
     pcl::PointCloud<pcl::PointXYZI> cloud;
+    pcl::PointCloud<pcl::PointXYZRGBL> ccloud;
     cloud.width    = LINES_PER_BLK*BKNUM_PER_FRM;
     cloud.height   = PNTS_PER_LINE;
-    cloud.is_dense = true;  //不是稠密型的
+    cloud.is_dense = false;
+    ccloud.width    = LINES_PER_BLK*BKNUM_PER_FRM;
+    ccloud.height   = PNTS_PER_LINE;
+    ccloud.is_dense = false;
     int num = 0;
-    cloud.points.resize (cloud.width * cloud.height);  //点云总数大小
-    for (int i=0; i<BKNUM_PER_FRM; i++) {
-        for (int j=0; j<LINES_PER_BLK; j++) {
-            for (int k=0; k<PNTS_PER_LINE; k++) {
-                p = &onefrm->dsv[i].points[j*PNTS_PER_LINE+k];
-                if (!p->i)
-                    continue;
-                rng=sqrt(sqr(p->x)+sqr(p->y)+sqr(p->z));
-                x=i*LINES_PER_BLK+j;
-                y=k;
-                cloud.points[num].x = rm.pts[y*rm.wid+x].x;
-                cloud.points[num].y = rm.pts[y*rm.wid+x].x;
-                cloud.points[num].z = rm.pts[y*rm.wid+x].z;
-                cloud.points[num].intensity =  rm.pts[y*rm.wid+x].i;
-                //maybe i missunderstanded the meaning of i in points
-                num += 1;
-            }
+    cloud.points.resize (cloud.width * cloud.height);
+    ccloud.points.resize (cloud.width * cloud.height);
+    for (y=0; y<rm.len; y++) {
+        for (x=0; x<rm.wid; x++) {
+            cloud.points[num].x = rm.pts[y*rm.wid+x].x;
+            cloud.points[num].y = rm.pts[y*rm.wid+x].y;
+            cloud.points[num].z = rm.pts[y*rm.wid+x].z;
+            cloud.points[num].intensity =  rm.pts[y*rm.wid+x].i;
+            ccloud.points[num].x = rm.pts[y*rm.wid+x].x;
+            ccloud.points[num].y = rm.pts[y*rm.wid+x].y;
+            ccloud.points[num].z = rm.pts[y*rm.wid+x].z;
+            ccloud.points[num].rgb = to_rgb(rm.gt[y*rm.wid+x]);
+            ccloud.points[num].label = rm.gt[y*rm.wid+x];
+            num += 1;
         }
-
     }
-    string name = "tmp_pcd/pcd_" + s_time + ".pcd";
+    string name = "pcd/" + s_time + ".pcd";
     pcl::io::savePCDFileASCII(name,cloud);
-//    pcl::visualization::CloudViewer viewer("point cloud");
-//    viewer.showCloud(cloud.makeShared());
+    string cname = "pcd/" + s_time + "_c.pcd";
+    pcl::io::savePCDFileASCII(cname,ccloud);
 }
 
 void ProcessOneFrame ()
@@ -124,12 +141,9 @@ void ProcessOneFrame ()
 	point3fi *p;
     int i_time = onefrm->dsv[0].millisec;
     string s_time = to_string(i_time);
-//    stringstream ss;
-//    ss<<i_time;
-//    ss>>s_time;
     string gt_end = "_gt.png";
-    Mat gt_img;
-    gt_img = imread(img_path + s_time + gt_end);
+    cv::Mat gt_img;
+    gt_img = cv::imread(img_path + s_time + gt_end);
 
 	//处理一帧vel32数据、传感器坐标系数据
 
@@ -158,7 +172,7 @@ void ProcessOneFrame ()
 				p = &onefrm->dsv[i].points[j*PNTS_PER_LINE+k];
 				if (!p->i)
 					continue;
-				rng=sqrt(sqr(p->x)+sqr(p->y)+sqr(p->z));
+                rng=sqrt(SQR(p->x)+SQR(p->y)+SQR(p->z));
 				x=i*LINES_PER_BLK+j;
 				y=k;
 				rm.pts[y*rm.wid+x] = onefrm->dsv[i].points[j*PNTS_PER_LINE+k];
@@ -171,34 +185,64 @@ void ProcessOneFrame ()
 		}
 	}
 
-	//对每一行数据中短暂无效激光点（cnt<5，约水平1度)进行内插补齐，否则这些无效点处会被认为是边界点
-	SmoothingData ();
-//    transformToPclFormat();
+    if(MODE == RG)
+    {
+        //对每一行数据中短暂无效激光点（cnt<5，约水平1度)进行内插补齐，否则这些无效点处会被认为是边界点
+        SmoothingData ();
+        transformToPclFormat();
 
-	//根据大致的传感器高度，找到连续的地面点，拟合地平面，地平面保存到Equation中
-	static double	Equation[4]={0,0,1,0};
-	double		Error;
-	EstimateGround (Equation, Error);
+        //根据大致的传感器高度，找到连续的地面点，拟合地平面，地平面保存到Equation中
+        static double	Equation[4]={0,0,1,0};
+        double		Error;
+        EstimateGround (Equation, Error);
 
-	//根据Equation，矫正激光点，使得地面水平，地面高度为0，使得高度信息可用于分离
-	CorrectPoints (Equation);
+        //根据Equation，矫正激光点，使得地面水平，地面高度为0，使得高度信息可用于分离
+        CorrectPoints (Equation);
 
-	//标注地面点
-	LabelBackground ();
+        //标注地面点
+        LabelBackground ();
 
-	//分割
-	//第一步：标注边界点ContourExtraction();
-	//第二步：区域增长方式标注区域内点RegionGrow()
-	//第三步：将边界点合并到相邻区域EdgeGrow ()
-	ContourSegger ();
+        //分割
+        //第一步：标注边界点ContourExtraction();
+        //第二步：区域增长方式标注区域内点RegionGrow()
+        //第三步：将边界点合并到相邻区域EdgeGrow ()
+        ContourSegger ();
 
-	//为每个区域生成一个segbuf，用于分类、目前仅提取了少量特征
-	EstimateSeg ();
+        //为每个区域生成一个segbuf，用于分类、目前仅提取了少量特征
+        EstimateSeg ();
 
-    DataAssociation ();
+        DataAssociation ();
 
-	//分类、目前仅根据区域块的宽和高进行分类
-	ClassiSeg ();
+        //分类、目前仅根据区域块的宽和高进行分类
+        ClassiSeg ();
+    }
+    else if(MODE == LCCP)
+    {
+        pcl::PointCloud<pcl::PointXYZL>::Ptr labeled_pc = LCCP_seg(s_time);
+
+        SmoothingData ();
+        static double	Equation[4]={0,0,1,0};
+        double		Error;
+        EstimateGround (Equation, Error);
+        CorrectPoints (Equation);
+        //标注地面点
+        LabelBackground ();
+        ContourExtraction();
+
+        for (y=0; y<rm.len; y++) {
+            for (x=0; x<rm.wid; x++) {
+                int k = y*rm.wid+x;
+                if(rm.regionID[k] != NONVALID && rm.regionID[k] != GROUND){
+                    rm.regionID[k] = labeled_pc->points[k].label;
+                    rm.regnum = max(rm.regnum,rm.regionID[k]+1);
+                }
+            }
+        }
+        rm.segbuf = new SEGBUF[rm.regnum];
+        memset (rm.segbuf, 0, sizeof (SEGBUF)*rm.regnum);
+        EstimateSeg ();
+        ClassiSeg ();
+    }
 
 	//按分割分类结果赋予可视化位图颜色
 	unsigned short val;
@@ -400,6 +444,8 @@ void DoLabeling()
         printf("%d\n", onefrm->dsv[0].millisec);
 		//每一帧的处理
 		ProcessOneFrame ();
+        int i_time = onefrm->dsv[0].millisec;
+        string s_time = to_string(i_time);
 
 		if (rm.regnum>=10000) {
 			printf("Warning: regionnum (%d). Can not exceed 10000\n",rm.regnum);
@@ -409,38 +455,34 @@ void DoLabeling()
         //Write2LabelFile ();
 
 		//可视化
-		cvResize (rm.rMap, out);
-		if (videooutput)
-			cvWriteFrame(riFrameWriter, out);
-		char str[10];
-		sprintf (str, "Fno%d", dFrmNo);
-		cvPutText(out, str,cvPoint(50,50),&font,CV_RGB(0,0,255));
-		cvShowImage("range image",out);
-		cvResize (rm.lMap, col);
-		if (videooutput)
-			cvWriteFrame(seFrameWriter, col);
-//		cvShowImage("segmentation",col);
-		cvResize (rm.dMap, col);
-//		cvShowImage("data association",col);
-        cvResize (rm.gtMap, col);
-        cvShowImage("ground truth",col);
         if (videooutput)
+        {
+            cvResize (rm.rMap, out);
+            cvWriteFrame(riFrameWriter, out);
+            char str[10];
+            sprintf (str, "Fno%d", dFrmNo);
+            cvPutText(out, str,cvPoint(50,50),&font,CV_RGB(0,0,255));
+            cvShowImage("range image",out);
+            cvResize (rm.lMap, col);
+            cvWriteFrame(seFrameWriter, col);
+    //		cvShowImage("segmentation",col);
+            cvResize (rm.dMap, col);
+    //		cvShowImage("data association",col);
+            cvResize (rm.gtMap, col);
+            cvShowImage("ground truth",col);
             cvWriteFrame(gtFrameWriter, col);
+            cvResize (rm.sMap, col);
+            cvShowImage("classification",col);
+            cvWriteFrame(clFrameWriter, col);
 
-		//if (videooutput)
-		//	cvWriteFrame(clFrameWriter, col);
-		cvResize (rm.sMap, col);
-		cvShowImage("classification",col);
-		if (videooutput)
-			cvWriteFrame(clFrameWriter, col);
-
-//        if(onefrm->dsv[0].millisec == 34889374)
-//        {
-//            Mat LMAP(rm.lMap);
-//            imwrite("seg.png",LMAP);
-//            Mat SMAP(rm.sMap);
-//            imwrite("classify.png",SMAP);
-//        }
+            cv::Mat SMAP(rm.sMap);
+            cv::Size dsize = cv::Size(1080, 32);
+            cv::resize(SMAP,SMAP,dsize,0,0,cv::INTER_NEAREST);
+            cv::imwrite("images/"+s_time+"_rg.png",SMAP);
+            cv::Mat GTMAP(rm.gtMap);
+            cv::resize(GTMAP,GTMAP,dsize,0,0,cv::INTER_NEAREST);
+            cv::imwrite("images/"+s_time+"_merge.png",GTMAP);
+        }
 
 		char WaitKey;
 		WaitKey = cvWaitKey(waitkeydelay);
@@ -468,10 +510,9 @@ void DoLabeling()
 	delete []onefrm;
 }
 
-//会对数据重新进行分割和关联
 int main (int argc, char *argv[])
 {
-    videooutput = 1; //
+
     std::string dsvlfilename = "2-2-bg.dsvl";
     //std::string dsvlfilename = "/home/pku-m/SemanticMap/Data/FineAnnotation/2-1/2-1.dsvl";
     //std::string dsvlfilename = "/media/pku-m/OrangePassport4T1/SemanticDataCollect/20170410_campus/origin/campus2/3D/2.dsv";
@@ -503,11 +544,11 @@ int main (int argc, char *argv[])
 
     seglogfp = fopen (outseglogfilename.c_str(), "w");
 
-	DoLabeling ();
+    DoLabeling ();
 
-	fprintf (stderr, "Labeling succeeded.\n");
+    fprintf (stderr, "Labeling succeeded.\n");
 
-	fclose (seglogfp);
+    fclose (seglogfp);
 
     dfp.close();
 

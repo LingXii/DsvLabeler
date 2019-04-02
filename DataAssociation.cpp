@@ -233,13 +233,13 @@ void DataAssociation ()
 			double mindis=100.0;
 			for (xi=segbuf->dmin.x; xi<=segbuf->dmax.x; xi++) {
 				if (rm.pts[y0*rm.wid+xi].i && rm.regionID[y0*rm.wid+xi]==regionid) {
-					mindis = sqrt(sqr(rm.pts[y0*rm.wid+xi].x)+sqr(rm.pts[y0*rm.wid+xi].y)+sqr(rm.pts[y0*rm.wid+xi].z));
+                    mindis = sqrt(SQR(rm.pts[y0*rm.wid+xi].x)+SQR(rm.pts[y0*rm.wid+xi].y)+SQR(rm.pts[y0*rm.wid+xi].z));
 					break;
 				}
 			}
 			for (xi=segbuf->dmax.x; xi>=segbuf->dmin.x; xi--) {
 				if (rm.pts[y0*rm.wid+xi].i && rm.regionID[y0*rm.wid+xi]==regionid) {
-					mindis = min(mindis,(double)sqrt(sqr(rm.pts[y0*rm.wid+xi].x)+sqr(rm.pts[y0*rm.wid+xi].y)+sqr(rm.pts[y0*rm.wid+xi].z)));
+                    mindis = min(mindis,(double)sqrt(SQR(rm.pts[y0*rm.wid+xi].x)+SQR(rm.pts[y0*rm.wid+xi].y)+SQR(rm.pts[y0*rm.wid+xi].z)));
 					break;
 				}
 			}

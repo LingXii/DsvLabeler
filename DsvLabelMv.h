@@ -1,6 +1,6 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <memory.h>
 #include <math.h>
 #include <time.h>
@@ -11,13 +11,13 @@
 #include <opencv2/opencv.hpp>
 
 using namespace std;
-using namespace cv;
+//using namespace cv;
 
 const int maxn = 2000000000;
 const double topi = acos(-1.0)/180.0;	// pi/180
 #define BOUND(x,min,max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
 #define	nint(x)			(int)((x>0)?(x+0.5):(x-0.5))
-#define	sqr(x)			((x)*(x))
+#define	SQR(x)			((x)*(x))
 
 struct point2d
 {
@@ -158,7 +158,7 @@ typedef struct {
 #define	OBGLAB2			1 // bike
 #define	OBGLAB3			2 // car
 #define	OBGLAB4			5 // building
-#define	OBGLAB5			3 // chunk, sign
+#define	OBGLAB5			4 // chunk, sign
 #define	OBGLAB6			3 // small
 #define	OBGLAB7			3 // bush
 #define OBJGROUND		100

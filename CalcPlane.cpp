@@ -222,7 +222,7 @@ void Calculate_Residuals(double *X, double *Y, double *Z, double Equation[4],
 	t=0;
 	for (i=0; i<PointsTotal; i++) {
 		distance=(Equation[0]*X[i]+Equation[1]*Y[i]+Equation[2]*
-		Z[i]+Equation[3])/sqrt(Equation[0]*Equation[0]+Equation[1]*
+        Z[i]+Equation[3])/sqrt(Equation[0]*Equation[0]+Equation[1]*
 		Equation[1]+Equation[2]*Equation[2]);
 		*Error=*Error+fabs(distance);
 		t++;
@@ -288,7 +288,7 @@ void tred2(double a[3][3], double d[3], double e[3])
 				h+=a[i-1][k-1]*a[i-1][k-1];	/* form sigma in h. */
 				}
 			f=a[i-1][l-1];
-			g=f>0? -sqrt(h):sqrt(h);
+            g=f>0? -sqrt(h):sqrt(h);
 			e[i-1]=scale*g;
 			h-=f*g;	/* now h is equation (11.2.4) */
 			a[i-1][l-1]=f-g;	/* store u in the ith row of a. */
@@ -394,7 +394,7 @@ void tqli(double d[3],double e[3],double z[3][3])
 				printf("\nToo many iterations in TQLI");
 				}
 			g=(d[l]-d[l-1])/(2.0*e[l-1]); /* form shift */
-			r=sqrt((g*g)+1.0);
+            r=sqrt((g*g)+1.0);
 			g=d[m-1]-d[l-1]+e[l-1]/(g+SIGN(r,g)); /* this is dm-ks */
 			s=c=1.0;
 			p=0.0;
@@ -410,14 +410,14 @@ void tqli(double d[3],double e[3],double z[3][3])
 				if(fabs(f) >= fabs(g))
 					{
 					c=g/f;
-					r=sqrt((c*c)+1.0);
+                    r=sqrt((c*c)+1.0);
 					e[i]=f*r;
 					c*=(s=1.0/r);
 					}
 				else
 					{
 					s=f/g;
-					r=sqrt((s*s)+1.0);
+                    r=sqrt((s*s)+1.0);
 					e[i]=g*r;
 					s*=(c=1.0/r);
 					}

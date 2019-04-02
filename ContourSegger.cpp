@@ -395,11 +395,11 @@ bool ContourSegger()
 {
 	ContourExtraction();
 	
-	rm.regnum = RegionGrow()+1;
+    rm.regnum = RegionGrow()+1;
 
-	Region2Seg ();
+    Region2Seg ();
 
-	EdgeGrow ();
+    EdgeGrow ();
 
     return 1;
 }
@@ -531,7 +531,7 @@ void EstimateSeg ()
 		segbuf->cp.x /= segbuf->ptnum;
 		segbuf->cp.y /= segbuf->ptnum;
 		segbuf->cp.z /= segbuf->ptnum;
-		segbuf->wi = max(0.5,sqrt(sqr(segbuf->maxp.x-segbuf->minp.x)+sqr(segbuf->maxp.y-segbuf->minp.y))); 
+        segbuf->wi = max(0.5,sqrt(SQR(segbuf->maxp.x-segbuf->minp.x)+SQR(segbuf->maxp.y-segbuf->minp.y)));
 	}
 }
 
@@ -543,14 +543,14 @@ void ClassiSeg ()
 			continue;
 
 		double wiH=0, wi;
-		wi = sqrt(sqr(segbuf->maxp.x-segbuf->minp.x)+sqr(segbuf->maxp.y-segbuf->minp.y)); 
-		if (segbuf->ptnumH) wiH = sqrt(sqr(segbuf->maxpH.x-segbuf->minpH.x)+sqr(segbuf->maxpH.y-segbuf->minpH.y)); 
+        wi = sqrt(SQR(segbuf->maxp.x-segbuf->minp.x)+SQR(segbuf->maxp.y-segbuf->minp.y));
+        if (segbuf->ptnumH) wiH = sqrt(SQR(segbuf->maxpH.x-segbuf->minpH.x)+SQR(segbuf->maxpH.y-segbuf->minpH.y));
 
 		if (segbuf->maxp.z>2.5 || wi>8.0) {			//larger or higher than mv
-			if (segbuf->maxp.z>2.0 && wi<2.5)		//tall obj but too thin for a bus 
-				segbuf->lab = OBGLAB5;				//could be trunk, pole, sign board etc.
-			else if (segbuf->maxp.z<=1.1)			
-				segbuf->lab = OBGLAB7;				//low and fat object, could be a part of car/bus or bush
+            if (wi<7 || segbuf->maxp.z<2)		//tall obj but too thin for a bus
+                segbuf->lab = OBGLAB6;				//could be trunk, pole, sign board etc.
+//			else if (segbuf->maxp.z<=1.1)
+//				segbuf->lab = OBGLAB7;				//low and fat object, could be a part of car/bus or bush
 			else
 				segbuf->lab = OBGLAB4;				//other large and high object
 		}
@@ -571,7 +571,7 @@ void ClassiSeg ()
 					if (wi>0.2)						//could be a ped
 						segbuf->lab = OBGLAB1;
 					else
-						segbuf->lab = OBGLAB5;		//tall and thin object
+                        segbuf->lab = OBGLAB3;		//tall and thin object
 				}
 				else
 					segbuf->lab = OBGLAB3;			//middle height, fat, could be a car
@@ -579,7 +579,7 @@ void ClassiSeg ()
 		}
 		else if (wi<2.5) {	//wi in [1.5,2.5)
 			if (segbuf->maxpH.z>2.0)				//tall obj, too thin for a bus 
-				segbuf->lab = OBGLAB5;
+                segbuf->lab = OBGLAB6;
 			else {			//maxpH.z in (1.1,2.0]
 				if (wiH<1.0) 						//high part is thin
 					segbuf->lab = OBGLAB2;			//could be a bicycle
