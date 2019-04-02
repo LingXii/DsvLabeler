@@ -46,3 +46,11 @@ Function `EstimateSeg ()` is used to do this step. And we get a final segmentati
 Classify every region by height and thickness of the region. The rule of classification is like:  
 ![fig3](https://github.com/LingXii/DsvLabeler/blob/master/res/fig3.png)  
 Function `ClassiSeg()` is used to do this step. Finally, we get a semantic segmentation result.  
+
+# Using PCL - LCCPSegmentation Algorithm
+Function `LCCP_seg(string s_time)` in `pclmethod.cpp` is used to do segmentation using LCCP algorithm, which input the timestamp and return the labeled point cloud pointer. This function need point cloud data, you can transform the dsvl data to point cloud format by `transformToPclFormat()` function.  
+Then The labeled point cloud will be projected to the range image, and the rule-based classifier mentioned before will help to classify every region.  
+Now, two mode is defined in line 12,13 in `main.cpp`. If you're in mode `RG`, you will use region growing method to do segmentation and get the point cloud data transformed by dsvl data. If you're in mode `LCCP`, you will use LCCP method to do segmentation.  
+
+# Evaluating result
+File `acc.py` is used to evaluate the segmentation and classification result. Before you run the code, ground truth images and result images should be in the `IMAGE_PATH`.
